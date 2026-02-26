@@ -19,6 +19,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -36,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -62,6 +64,7 @@ import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.utils.overScrollVertical
 
 sealed interface Screen : NavKey {
     data object Home : Screen
@@ -267,28 +270,34 @@ fun MainUI(
                     },
                     label = "MainPageAnim"
                 ) { state ->
-                    Box(modifier = Modifier.padding(padding)) {
-                        when (state) {
-                            "detail" -> PodDetailPage(
-                                batteryParams = displayBattery,
-                                ancMode = displayAnc,
-                                onAncModeChange = { setAncMode(it) },
-                                gameMode = displayGameMode,
-                                onGameModeChange = { setGameMode(it) }
-                            )
-                            "connecting" -> ConnectingPage()
-                            "error" -> ErrorPage(onRetry = { appController.disconnect() })
-                            else -> DevicePickerPage(onDeviceSelected = { onDeviceSelected(it) })
-                        }
+                    when (state) {
+                        "detail" -> PodDetailPage(
+                            modifier = Modifier
+                                .overScrollVertical()
+                                .nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),
+                            contentPadding = padding,
+                            batteryParams = displayBattery,
+                            ancMode = displayAnc,
+                            onAncModeChange = { setAncMode(it) },
+                            gameMode = displayGameMode,
+                            onGameModeChange = { setGameMode(it) }
+                        )
+                        "connecting" -> Box(Modifier.padding(padding).fillMaxSize()) { ConnectingPage() }
+                        "error" -> Box(Modifier.padding(padding).fillMaxSize()) { ErrorPage(onRetry = { appController.disconnect() }) }
+                        else -> Box(Modifier.padding(padding).fillMaxSize()) { DevicePickerPage(onDeviceSelected = { onDeviceSelected(it) }) }
                     }
                 }
             }
         }
         entry<Screen.Settings> {
+            val settingsScrollBehavior = MiuixScrollBehavior(rememberTopAppBarState())
+
             Scaffold(
                 topBar = {
                     TopAppBar(
                         title = stringResource(R.string.settings),
+                        largeTitle = stringResource(R.string.settings),
+                        scrollBehavior = settingsScrollBehavior,
                         navigationIcon = {
                             IconButton(
                                 onClick = { backStack.removeLast() },
@@ -304,7 +313,10 @@ fun MainUI(
                 }
             ) { padding ->
                 SettingsPage(
-                    modifier = Modifier.padding(padding),
+                    modifier = Modifier
+                        .overScrollVertical()
+                        .nestedScroll(settingsScrollBehavior.nestedScrollConnection),
+                    contentPadding = padding,
                     themeMode = themeMode,
                     onThemeModeChange = onThemeModeChange,
                     autoGameMode = autoGameMode,

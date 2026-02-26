@@ -1,6 +1,7 @@
 package moe.chenxy.oppopods.ui
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -22,6 +23,8 @@ import top.yukonga.miuix.kmp.extra.SuperSwitch
 
 @Composable
 fun PodDetailPage(
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
     batteryParams: BatteryParams,
     ancMode: NoiseControlMode,
     onAncModeChange: (NoiseControlMode) -> Unit,
@@ -29,7 +32,8 @@ fun PodDetailPage(
     onGameModeChange: (Boolean) -> Unit = {}
 ) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
+        contentPadding = contentPadding,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         item {

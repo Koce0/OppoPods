@@ -2,6 +2,7 @@ package moe.chenxy.oppopods.ui
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -26,6 +27,7 @@ import top.yukonga.miuix.kmp.extra.SuperSwitch
 @Composable
 fun SettingsPage(
     modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
     themeMode: MutableState<Int> = mutableStateOf(0),
     onThemeModeChange: (Int) -> Unit = {},
     autoGameMode: MutableState<Boolean> = mutableStateOf(false),
@@ -42,7 +44,13 @@ fun SettingsPage(
     )
 
     LazyColumn(
-        modifier = modifier.fillMaxSize().padding(12.dp),
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            top = contentPadding.calculateTopPadding() + 12.dp,
+            bottom = contentPadding.calculateBottomPadding() + 12.dp,
+            start = 12.dp,
+            end = 12.dp
+        ),
     ) {
         item {
             Card {
