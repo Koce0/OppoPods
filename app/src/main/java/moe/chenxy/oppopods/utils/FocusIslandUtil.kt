@@ -9,9 +9,9 @@ import android.graphics.BitmapFactory
 import android.graphics.drawable.Icon
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import com.xzakota.hyper.notification.focus.FocusNotification
 import moe.chenxy.oppopods.R
+import moe.chenxy.oppopods.hook.Log
 import moe.chenxy.oppopods.utils.miuiStrongToast.data.BatteryParams
 
 @SuppressLint("WrongConstant")

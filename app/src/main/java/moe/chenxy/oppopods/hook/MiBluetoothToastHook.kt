@@ -13,7 +13,6 @@ import android.content.IntentFilter
 import android.graphics.BitmapFactory
 import android.graphics.drawable.Icon
 import android.os.Bundle
-import android.util.Log
 import com.xzakota.hyper.notification.focus.FocusNotification
 import moe.chenxy.oppopods.utils.FocusIslandUtil
 import moe.chenxy.oppopods.utils.SystemApisUtils

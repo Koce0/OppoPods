@@ -6,7 +6,6 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothHeadset
 import android.content.ContextWrapper
 import android.os.Handler
-import android.util.Log
 import moe.chenxy.oppopods.pods.RfcommController
 import moe.chenxy.oppopods.utils.SystemApisUtils.setIconVisibility
 

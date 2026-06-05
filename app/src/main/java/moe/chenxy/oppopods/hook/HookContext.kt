@@ -60,6 +60,43 @@ abstract class HookContext {
     }
 }
 
+object Log {
+    @Volatile
+    var module: XposedModule? = null
+
+    fun v(tag: String, message: String) {
+        module?.log(android.util.Log.INFO, tag, message)
+    }
+
+    fun i(tag: String, message: String) {
+        module?.log(android.util.Log.INFO, tag, message)
+    }
+
+    fun d(tag: String, message: String) {
+        module?.log(android.util.Log.INFO, tag, message)
+    }
+
+    fun d(tag: String, message: String, throwable: Throwable) {
+        module?.log(android.util.Log.ERROR, tag, message, throwable)
+    }
+
+    fun w(tag: String, message: String) {
+        module?.log(android.util.Log.INFO, tag, message)
+    }
+
+    fun w(tag: String, message: String, throwable: Throwable) {
+        module?.log(android.util.Log.ERROR, tag, message, throwable)
+    }
+
+    fun e(tag: String, message: String) {
+        module?.log(android.util.Log.ERROR, tag, message)
+    }
+
+    fun e(tag: String, message: String, throwable: Throwable) {
+        module?.log(android.util.Log.ERROR, tag, message, throwable)
+    }
+}
+
 class HookParam(private val chain: XposedInterface.Chain, initialResult: Any?) {
     val args: List<Any?> = chain.args
     val instance: Any? = chain.thisObject

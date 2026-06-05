@@ -10,10 +10,10 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import android.widget.Toast
 import kotlinx.serialization.json.Json
 import moe.chenxy.oppopods.BuildConfig
+import moe.chenxy.oppopods.hook.Log
 import moe.chenxy.oppopods.utils.SystemApisUtils.isHyperOS
 import moe.chenxy.oppopods.utils.miuiStrongToast.data.BatteryParams
 import moe.chenxy.oppopods.utils.miuiStrongToast.data.IconParams

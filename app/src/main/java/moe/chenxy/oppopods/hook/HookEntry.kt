@@ -2,7 +2,6 @@ package moe.chenxy.oppopods.hook
 
 import android.content.SharedPreferences
 import android.os.Build
-import android.util.Log
 import androidx.annotation.RequiresApi
 import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface.PackageLoadedParam
@@ -31,6 +30,7 @@ class HookEntry : XposedModule() {
     }
 
     private fun loadHook(hook: HookContext, classLoader: ClassLoader, packageName: String) {
+        Log.module = this
         hook.module = this
         hook.appClassLoader = classLoader
         hook.packageName = packageName
