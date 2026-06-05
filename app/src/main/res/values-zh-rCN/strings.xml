@@ -45,5 +45,7 @@
     <string name="cycle_anc">切换降噪</string>
     <string name="adaptive_mode">自适应模式</string>
     <string name="adaptive_mode_summary">为兼容耳机启用自适应降噪模式，关闭后将隐藏该选项并禁用相关音频处理</string>
+    <string name="persistent_island">常驻超级岛</string>
+    <string name="persistent_island_summary">保持超级岛通知可见，直到耳机断开连接</string>
     <string name="notification_btn_disconnect">断开连接</string>
 </resources>

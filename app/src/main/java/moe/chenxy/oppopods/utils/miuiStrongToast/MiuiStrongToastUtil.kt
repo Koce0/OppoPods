@@ -121,6 +121,18 @@ object MiuiStrongToastUtil {
         context.sendBroadcast(intent)
     }
 
+    fun showPodsPersistentIslandByMiuiBt(
+        context: Context,
+        batteryParams: BatteryParams,
+        device: BluetoothDevice,
+    ) {
+        val intent = Intent("chen.action.oppopods.updatepodspersistentisland")
+        intent.putExtra("batteryParams", batteryParams)
+        intent.putExtra("device", device)
+        intent.`package` = "com.xiaomi.bluetooth"
+        context.sendBroadcast(intent)
+    }
+
     fun cancelPodsNotificationByMiuiBt(
         context: Context,
         device: BluetoothDevice,

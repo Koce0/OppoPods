@@ -51,6 +51,7 @@ import moe.chenxy.oppopods.pods.AppRfcommController
 import moe.chenxy.oppopods.pods.NoiseControlMode
 import moe.chenxy.oppopods.utils.miuiStrongToast.data.BatteryParams
 import moe.chenxy.oppopods.utils.miuiStrongToast.data.OppoPodsAction
+import moe.chenxy.oppopods.utils.miuiStrongToast.data.OppoPodsPrefsKey
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
@@ -88,10 +89,19 @@ fun MainUI(
 
     // Auto game mode preference (persisted)
     val prefs = remember { context.getSharedPreferences("oppopods_settings", Context.MODE_PRIVATE) }
-    val autoGameMode = remember { mutableStateOf(prefs.getBoolean("auto_game_mode", false)) }
-    val openHeyTap = remember { mutableStateOf(prefs.getBoolean("open_heytap", false)) }
+    val autoGameMode = remember {
+        mutableStateOf(prefs.getBoolean("auto_game_mode", false))
+    }
+    val openHeyTap = remember {
+        mutableStateOf(prefs.getBoolean("open_heytap", false))
+    }
     // Adaptive模式偏好设置（持久化存储），默认开启
-    val adaptiveMode = remember { mutableStateOf(prefs.getBoolean("adaptive_mode", true)) }
+    val adaptiveMode = remember {
+        mutableStateOf(prefs.getBoolean("adaptive_mode", true))
+    }
+    val persistentIsland = remember {
+        mutableStateOf(prefs.getBoolean(OppoPodsPrefsKey.PERSISTENT_ISLAND, true))
+    }
 
     val appController = remember { AppRfcommController() }
     val appConnState by appController.connectionState.collectAsState()
@@ -344,6 +354,12 @@ fun MainUI(
                         if (!it && displayAnc == NoiseControlMode.ADAPTIVE) {
                             setAncMode(NoiseControlMode.NOISE_CANCELLATION)
                         }
+                    },
+                    persistentIsland = persistentIsland,
+                    onPersistentIslandChange = {
+                        persistentIsland.value = it
+                        prefs.edit().putBoolean(OppoPodsPrefsKey.PERSISTENT_ISLAND, it).apply()
+                        Log.d("OppoPods", "Persistent island preference saved: $it")
                     }
                 )
             }

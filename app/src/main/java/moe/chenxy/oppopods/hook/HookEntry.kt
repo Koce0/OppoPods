@@ -6,15 +6,20 @@ import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface.PackageLoadedParam
 
 class HookEntry : XposedModule() {
+    private val loadedHooks = mutableSetOf<String>()
+
     @RequiresApi(Build.VERSION_CODES.Q)
     override fun onPackageLoaded(param: PackageLoadedParam) {
-        if (!param.isFirstPackage) return
-
-        when (param.packageName) {
-            "com.android.bluetooth" -> loadHook(HeadsetStateDispatcher, param.defaultClassLoader)
-            "com.milink.service" -> loadHook(MiLinkServiceHook, param.defaultClassLoader)
-            "com.xiaomi.bluetooth" -> loadHook(MiBluetoothToastHook, param.defaultClassLoader)
+        val hook = when (param.packageName) {
+            "com.android.bluetooth" -> HeadsetStateDispatcher
+            "com.milink.service" -> MiLinkServiceHook
+            "com.xiaomi.bluetooth" -> MiBluetoothToastHook
+            else -> return
         }
+        val hookKey = "${param.packageName}@${System.identityHashCode(param.defaultClassLoader)}"
+        if (!loadedHooks.add(hookKey)) return
+
+        loadHook(hook, param.defaultClassLoader)
     }
 
     private fun loadHook(hook: HookContext, classLoader: ClassLoader) {

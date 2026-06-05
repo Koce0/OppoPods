@@ -35,7 +35,9 @@ fun SettingsPage(
     openHeyTap: MutableState<Boolean> = mutableStateOf(false),
     onOpenHeyTapChange: (Boolean) -> Unit = {},
     adaptiveMode: MutableState<Boolean> = mutableStateOf(true),
-    onAdaptiveModeChange: (Boolean) -> Unit = {}
+    onAdaptiveModeChange: (Boolean) -> Unit = {},
+    persistentIsland: MutableState<Boolean> = mutableStateOf(true),
+    onPersistentIslandChange: (Boolean) -> Unit = {}
 ) {
     val context = LocalContext.current
     val showHeyTapWarning = remember { mutableStateOf(false) }
@@ -78,6 +80,12 @@ fun SettingsPage(
                     title = stringResource(R.string.auto_game_mode),
                     checked = autoGameMode.value,
                     onCheckedChange = { onAutoGameModeChange(it) }
+                )
+                SwitchPreference(
+                    title = stringResource(R.string.persistent_island),
+                    summary = stringResource(R.string.persistent_island_summary),
+                    checked = persistentIsland.value,
+                    onCheckedChange = { onPersistentIslandChange(it) }
                 )
                 SwitchPreference(
                     title = stringResource(R.string.open_heytap),

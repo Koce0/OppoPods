@@ -29,7 +29,7 @@ object HeadsetStateDispatcher : HookContext() {
                 val statusBarManager = context.getSystemService("statusbar") as StatusBarManager
                 if (currState == BluetoothHeadset.STATE_CONNECTED) {
                     statusBarManager.setIconVisibility("wireless_headset", true)
-                    RfcommController.connectPod(context, device, prefs)
+                    RfcommController.connectPod(context, device)
                 } else if (currState == BluetoothHeadset.STATE_DISCONNECTING || currState == BluetoothHeadset.STATE_DISCONNECTED) {
                     statusBarManager.setIconVisibility("wireless_headset", false)
                     RfcommController.disconnectedPod(context, device)

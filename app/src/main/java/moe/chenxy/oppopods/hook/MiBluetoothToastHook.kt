@@ -15,6 +15,7 @@ import android.graphics.drawable.Icon
 import android.os.Bundle
 import android.util.Log
 import com.xzakota.hyper.notification.focus.FocusNotification
+import moe.chenxy.oppopods.provider.OppoPodsPrefsProvider
 import moe.chenxy.oppopods.utils.FocusIslandUtil
 import moe.chenxy.oppopods.utils.SystemApisUtils
 import moe.chenxy.oppopods.utils.SystemApisUtils.cancelAsUser
@@ -29,6 +30,7 @@ object MiBluetoothToastHook : HookContext() {
     // ANC 模式本地缓存，用于循环切换和状态同步（1=关 2=降噪 3=通透 4=自适应）
     // 通过接收 ACTION_PODS_ANC_CHANGED 广播与 RfcommController 保持同步
     private var localAncMode = 1
+    private var receiverRegistered = false
 
     override fun onHook() {
 
@@ -230,8 +232,10 @@ object MiBluetoothToastHook : HookContext() {
         }
 
 
-        hookConstructorAfter(findConstructorByParamCount("com.android.bluetooth.ble.app.MiuiBluetoothNotification", 2)) {
-            val context = getObjectField(instance, "mContext") as Context
+        fun registerReceiverIfNeeded(rawContext: Context) {
+            if (receiverRegistered) return
+            val context = rawContext.applicationContext ?: rawContext
+            receiverRegistered = true
 
                     val broadcastReceiver = object : BroadcastReceiver() {
                         override fun onReceive(p0: Context?, p1: Intent?) {
@@ -243,15 +247,20 @@ object MiBluetoothToastHook : HookContext() {
                                 val batteryParams = p1.getParcelableExtra<BatteryParams>("batteryParams", BatteryParams::class.java)
                                 val device = p1.getParcelableExtra("device", BluetoothDevice::class.java)
                                 createPodsNotification(device, context, batteryParams!!)
+                            } else if (p1?.action == "chen.action.oppopods.updatepodspersistentisland") {
+                                val batteryParams = p1.getParcelableExtra<BatteryParams>("batteryParams", BatteryParams::class.java)
+                                val device = p1.getParcelableExtra("device", BluetoothDevice::class.java)
+                                FocusIslandUtil.showPersistentIsland(context, batteryParams!!, device)
                             } else if (p1?.action == "chen.action.oppopods.cancelpodsnotification") {
                                 val device = p1.getParcelableExtra("device", BluetoothDevice::class.java) as BluetoothDevice
                                 cancelNotification(device, context)
+                                FocusIslandUtil.cancelIsland(context)
                             } else if (p1?.action == OppoPodsAction.ACTION_PODS_ANC_CHANGED) {
                                 // 同步耳机实际 ANC 状态到本地缓存，确保下次循环切换时状态准确
                                 localAncMode = p1.getIntExtra("status", 1)
                             } else if (p1?.action == OppoPodsAction.ACTION_ADAPTIVE_MODE_CHANGED) {
                                 // 接收来自 App 端设置页面的 Adaptive 模式开关状态变更，无需本地动作
-                                // cycle ANC 时通过 prefs bridge 实时读取偏好，此广播仅确保通知已送达
+                                // cycle ANC 时通过 Provider 实时读取偏好，此广播仅确保通知已送达
                                 val adaptiveEnabled = p1.getBooleanExtra("enabled", true)
                                 // 若关闭 Adaptive 且本地缓存的当前模式为 Adaptive，重置为降噪模式
                                 if (!adaptiveEnabled && localAncMode == 4) {
@@ -259,8 +268,10 @@ object MiBluetoothToastHook : HookContext() {
                                 }
                             } else if (p1?.action == OppoPodsAction.ACTION_CYCLE_ANC) {
                                 // 循环切换降噪模式：读取Adaptive模式偏好，关闭时跳过Adaptive仅三模式循环
-                                // 使用 prefs bridge 读取与 App 端同一 SharedPreferences 文件，确保状态同步
-                                val adaptiveEnabled = prefs.getBoolean("adaptive_mode", true)
+                                // 使用 Provider 读取与 App 端同一 SharedPreferences 文件，确保状态同步
+                                val adaptiveEnabled = OppoPodsPrefsProvider.readBoolean(context, "adaptive_mode", true) { e ->
+                                    Log.w("OppoPods", "Provider prefs read failed for adaptive_mode", e)
+                                }
                                 localAncMode = when (localAncMode) {
                                     2 -> if (adaptiveEnabled) 4 else 3  // NC → Adaptive（若启用）或 Transparency
                                     4 -> 3  // Adaptive → Transparency
@@ -278,6 +289,7 @@ object MiBluetoothToastHook : HookContext() {
 
                     val intentFilter = IntentFilter("chen.action.oppopods.sendstrongtoast")
                     intentFilter.addAction("chen.action.oppopods.updatepodsnotification")
+                    intentFilter.addAction("chen.action.oppopods.updatepodspersistentisland")
                     intentFilter.addAction("chen.action.oppopods.cancelpodsnotification")
                     intentFilter.addAction(OppoPodsAction.ACTION_CYCLE_ANC)
                     // 监听耳机实际 ANC 状态变更广播，保持 localAncMode 与 RfcommController 同步
@@ -286,6 +298,17 @@ object MiBluetoothToastHook : HookContext() {
                     intentFilter.addAction(OppoPodsAction.ACTION_ADAPTIVE_MODE_CHANGED)
                     context.registerReceiver(broadcastReceiver, intentFilter,
                         Context.RECEIVER_EXPORTED)
+        }
+
+        hookAfter(findMethod("android.app.Application", "attach", Context::class.java)) {
+            registerReceiverIfNeeded(args[0] as Context)
+        }
+
+        runCatching {
+            hookConstructorAfter(findConstructorByParamCount("com.android.bluetooth.ble.app.MiuiBluetoothNotification", 2)) {
+                val context = getObjectField(instance, "mContext") as Context
+                registerReceiverIfNeeded(context)
+            }
         }
     }
 }

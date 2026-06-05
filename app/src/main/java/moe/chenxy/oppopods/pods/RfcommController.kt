@@ -20,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import moe.chenxy.oppopods.BuildConfig
+import moe.chenxy.oppopods.provider.OppoPodsPrefsProvider
 import moe.chenxy.oppopods.utils.MediaControl
 import moe.chenxy.oppopods.utils.SystemApisUtils
 import moe.chenxy.oppopods.utils.SystemApisUtils.setIconVisibility
@@ -31,7 +32,6 @@ import moe.chenxy.oppopods.utils.miuiStrongToast.data.OppoPodsPrefsKey
 import moe.chenxy.oppopods.utils.miuiStrongToast.data.PodParams
 import java.io.IOException
 import java.io.InputStream
-import android.content.SharedPreferences
 import java.util.concurrent.Executor
 
 @SuppressLint("MissingPermission", "StaticFieldLeak")
@@ -47,8 +47,6 @@ object RfcommController {
     private val audioManager: AudioManager? by lazy {
         mContext?.getSystemService(AudioManager::class.java)
     }
-    private lateinit var mPrefs: SharedPreferences
-
     private var scanToken: MediaRouter2.ScanToken? = null
     var routes: List<MediaRoute2Info> = listOf()
     private lateinit var mediaRouter: MediaRouter2
@@ -60,6 +58,7 @@ object RfcommController {
     lateinit var currentBatteryParams: BatteryParams
     private var currentAnc: Int = 1
     private var currentGameMode: Boolean = false
+    private var persistentIslandEnabled: Boolean = true
     // Adaptive模式状态缓存，通过广播同步确保跨进程实时一致，避免 SharedPreferences 跨进程缓存导致读取过时值
     private var adaptiveModeEnabled: Boolean = true
     private var lastKnownCaseBattery: Int = 0
@@ -202,11 +201,16 @@ object RfcommController {
         val batteryParams = BatteryParams(left, right, case)
         currentBatteryParams = batteryParams
 
-        if (shouldShowToast) {
-            MiuiStrongToastUtil.showPodsBatteryToastByMiuiBt(mContext!!, batteryParams)
+        if (persistentIslandEnabled) {
+            MiuiStrongToastUtil.showPodsPersistentIslandByMiuiBt(mContext!!, batteryParams, mDevice)
             mShowedConnectedToast = true
+        } else {
+            if (shouldShowToast) {
+                MiuiStrongToastUtil.showPodsBatteryToastByMiuiBt(mContext!!, batteryParams)
+                mShowedConnectedToast = true
+            }
+            MiuiStrongToastUtil.showPodsNotificationByMiuiBt(mContext!!, batteryParams, mDevice)
         }
-        MiuiStrongToastUtil.showPodsNotificationByMiuiBt(mContext!!, batteryParams, mDevice)
         changeUIBatteryStatus(batteryParams)
 
         lastTempBatt = if (left.isConnected && right.isConnected)
@@ -250,14 +254,23 @@ object RfcommController {
         return method.invoke(device, RFCOMM_CHANNEL) as BluetoothSocket
     }
 
-    fun connectPod(context: Context, device: BluetoothDevice, prefs: SharedPreferences) {
+    private fun readBooleanPref(key: String, defaultValue: Boolean): Boolean {
+        val context = mContext ?: return defaultValue
+        return OppoPodsPrefsProvider.readBoolean(context, key, defaultValue) { e ->
+            Log.w(TAG, "Provider prefs read failed for $key", e)
+        }
+    }
+
+    fun connectPod(context: Context, device: BluetoothDevice) {
         mContext = context
         mDevice = device
-        mPrefs = prefs
         cachedDeviceName = device.name ?: ""
-        // 初始化 Adaptive 模式状态缓存，从 SharedPreferences 读取当前值
-        adaptiveModeEnabled = mPrefs.getBoolean("adaptive_mode", true)
+        val adaptiveModePref = readBooleanPref("adaptive_mode", true)
+        val persistentIslandPref = readBooleanPref(OppoPodsPrefsKey.PERSISTENT_ISLAND, false)
+        adaptiveModeEnabled = adaptiveModePref
+        persistentIslandEnabled = persistentIslandPref
         Log.d(TAG, "Adaptive mode initial: $adaptiveModeEnabled")
+        Log.d("OppoPods", "Persistent island initial in com.android.bluetooth: $persistentIslandEnabled")
 
         context.registerReceiver(broadcastReceiver, IntentFilter().apply {
             this.addAction(OppoPodsAction.ACTION_ANC_SELECT)
@@ -299,9 +312,9 @@ object RfcommController {
                 delay(300)
                 queryStatus()
 
-                // Auto-enable game mode if preference is set.
-                // Read remote module preferences since this runs in com.android.bluetooth.
-                if (mPrefs.getBoolean("auto_game_mode", false)) {
+                val autoGameModePref = readBooleanPref("auto_game_mode", false)
+                Log.d(TAG, "Auto game mode initial: $autoGameModePref")
+                if (autoGameModePref) {
                     delay(100)
                     sendPacketSafe(Enums.GAME_MODE_ON)
                 }
