@@ -91,12 +91,14 @@ object RfcommController {
     private fun changeUIBatteryStatus(status: BatteryParams) {
         Intent(OppoPodsAction.ACTION_PODS_BATTERY_CHANGED).apply {
             this.putExtra("status", status)
+            putBatteryExtras(status)
             this.`package` = BuildConfig.APPLICATION_ID
             this.addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
             mContext!!.sendBroadcast(this)
         }
         sendExternalPodsStatusBroadcast(OppoPodsAction.ACTION_PODS_BATTERY_CHANGED) {
             putExtra("status", status)
+            putBatteryExtras(status)
         }
     }
 
@@ -324,7 +326,7 @@ object RfcommController {
 
     private fun sendExternalPodsStatusBroadcast(action: String, fill: Intent.() -> Unit = {}) {
         val ctx = mContext ?: return
-        listOf("com.milink.service", "com.xiaomi.bluetooth").forEach { targetPackage ->
+        listOf("com.milink.service", "com.xiaomi.bluetooth", "com.android.settings").forEach { targetPackage ->
             Intent(action).apply {
                 if (::mDevice.isInitialized) {
                     putExtra("address", mDevice.address)
@@ -336,6 +338,18 @@ object RfcommController {
                 ctx.sendBroadcast(this)
             }
         }
+    }
+
+    private fun Intent.putBatteryExtras(status: BatteryParams) {
+        putExtra("left_battery", status.left?.battery ?: 0)
+        putExtra("left_charging", status.left?.isCharging == true)
+        putExtra("left_connected", status.left?.isConnected == true)
+        putExtra("right_battery", status.right?.battery ?: 0)
+        putExtra("right_charging", status.right?.isCharging == true)
+        putExtra("right_connected", status.right?.isConnected == true)
+        putExtra("case_battery", status.case?.battery ?: 0)
+        putExtra("case_charging", status.case?.isCharging == true)
+        putExtra("case_connected", status.case?.isConnected == true)
     }
 
     private fun startPacketReader(inputStream: InputStream) {
