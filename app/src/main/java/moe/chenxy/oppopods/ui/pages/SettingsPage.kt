@@ -191,7 +191,13 @@ fun SettingsPage(
                     selectedIndex = islandModeValues.indexOf(islandMode.value).coerceAtLeast(0),
                     onSelectedIndexChange = { onIslandModeChange(islandModeValues[it]) }
                 )
-                if (islandMode.value == ConfigManager.ISLAND_MODE_MODULE) {
+                SwitchPreference(
+                    title = stringResource(R.string.persistent_island),
+                    summary = stringResource(R.string.persistent_island_summary),
+                    checked = persistentIsland.value,
+                    onCheckedChange = { onPersistentIslandChange(it) }
+                )
+                if (islandMode.value == ConfigManager.ISLAND_MODE_MODULE && !persistentIsland.value) {
                     OverlayDropdownPreference(
                         title = stringResource(R.string.island_show_timing),
                         summary = stringResource(R.string.island_show_timing_summary),
@@ -199,12 +205,6 @@ fun SettingsPage(
                         collapseOnSelection = false,
                     )
                 }
-                SwitchPreference(
-                    title = stringResource(R.string.persistent_island),
-                    summary = stringResource(R.string.persistent_island_summary),
-                    checked = persistentIsland.value,
-                    onCheckedChange = { onPersistentIslandChange(it) }
-                )
                 SwitchPreference(
                     title = stringResource(R.string.auto_game_mode),
                     checked = autoGameMode.value,

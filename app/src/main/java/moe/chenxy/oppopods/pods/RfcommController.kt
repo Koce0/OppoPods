@@ -239,6 +239,10 @@ object RfcommController {
                     if (::currentBatteryParams.isInitialized) {
                         MiuiStrongToastUtil.showPodsNotificationByMiuiBt(mContext ?: return, currentBatteryParams, mDevice)
                     }
+                } else if (!wasPersistentIslandEnabled && ConfigManager.persistentIsland() && ::currentBatteryParams.isInitialized) {
+                    val context = mContext ?: return
+                    MiuiStrongToastUtil.cancelPodsLegacyNotificationByMiuiBt(context, mDevice)
+                    MiuiStrongToastUtil.showPodsPersistentIslandByMiuiBt(context, currentBatteryParams, mDevice)
                 } else if (ConfigManager.persistentIsland() && ::currentBatteryParams.isInitialized) {
                     MiuiStrongToastUtil.showPodsPersistentIslandByMiuiBt(mContext ?: return, currentBatteryParams, mDevice)
                 }

@@ -246,6 +246,11 @@ object MiBluetoothToastHook : HookContext() {
                     val broadcastReceiver = object : BroadcastReceiver() {
                         override fun onReceive(p0: Context?, p1: Intent?) {
                             if (p1?.action == "chen.action.oppopods.sendstrongtoast") {
+                                if (ConfigManager.persistentIsland()) {
+                                    Log.d("OppoPods", "skip temporary island while persistent island enabled")
+                                    FocusIslandUtil.cancelTemporaryIsland(context)
+                                    return
+                                }
                                 if (ConfigManager.islandMode() != ConfigManager.ISLAND_MODE_MODULE) {
                                     Log.d("OppoPods", "skip module island mode=${ConfigManager.islandMode()}")
                                     return
@@ -257,6 +262,12 @@ object MiBluetoothToastHook : HookContext() {
                             } else if (p1?.action == "chen.action.oppopods.updatepodsnotification") {
                                 val batteryParams = p1.getParcelableExtra<BatteryParams>("batteryParams", BatteryParams::class.java)
                                 val device = p1.getParcelableExtra("device", BluetoothDevice::class.java)
+                                if (ConfigManager.persistentIsland()) {
+                                    Log.d("OppoPods", "skip pods notification while persistent island enabled")
+                                    device?.let { cancelNotification(it, context) }
+                                    FocusIslandUtil.cancelTemporaryIsland(context)
+                                    return
+                                }
                                 createPodsNotification(device, context, batteryParams!!)
                             } else if (p1?.action == "chen.action.oppopods.updatepodspersistentisland") {
                                 val batteryParams = p1.getParcelableExtra<BatteryParams>("batteryParams", BatteryParams::class.java)
@@ -268,6 +279,10 @@ object MiBluetoothToastHook : HookContext() {
                                 val device = p1.getParcelableExtra("device", BluetoothDevice::class.java) as BluetoothDevice
                                 cancelNotification(device, context)
                                 FocusIslandUtil.cancelIsland(context)
+                            } else if (p1?.action == "chen.action.oppopods.cancelpodslegacynotification") {
+                                val device = p1.getParcelableExtra("device", BluetoothDevice::class.java)
+                                device?.let { cancelNotification(it, context) }
+                                FocusIslandUtil.cancelTemporaryIsland(context)
                             } else if (p1?.action == OppoPodsAction.ACTION_PODS_ANC_CHANGED) {
                                 // 同步耳机实际 ANC 状态到本地缓存，确保下次循环切换时状态准确
                                 localAncMode = p1.getIntExtra("status", 1)
@@ -302,6 +317,7 @@ object MiBluetoothToastHook : HookContext() {
                     intentFilter.addAction("chen.action.oppopods.updatepodspersistentisland")
                     intentFilter.addAction("chen.action.oppopods.cancelpodspersistentisland")
                     intentFilter.addAction("chen.action.oppopods.cancelpodsnotification")
+                    intentFilter.addAction("chen.action.oppopods.cancelpodslegacynotification")
                     intentFilter.addAction(OppoPodsAction.ACTION_CYCLE_ANC)
                     // 监听耳机实际 ANC 状态变更广播，保持 localAncMode 与 RfcommController 同步
                     intentFilter.addAction(OppoPodsAction.ACTION_PODS_ANC_CHANGED)

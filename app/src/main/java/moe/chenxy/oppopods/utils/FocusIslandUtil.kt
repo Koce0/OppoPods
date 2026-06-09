@@ -368,6 +368,15 @@ object FocusIslandUtil {
         }
     }
 
+    fun cancelTemporaryIsland(context: Context) {
+        try {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.cancel(NOTIFICATION_ID)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to cancel temporary Focus Island", e)
+        }
+    }
+
     fun cancelPersistentIsland(context: Context) {
         try {
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager

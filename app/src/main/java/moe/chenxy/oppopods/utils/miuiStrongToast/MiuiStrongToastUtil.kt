@@ -145,6 +145,16 @@ object MiuiStrongToastUtil {
         context.sendBroadcast(intent)
     }
 
+    fun cancelPodsLegacyNotificationByMiuiBt(
+        context: Context,
+        device: BluetoothDevice,
+    ) {
+        val intent = Intent("chen.action.oppopods.cancelpodslegacynotification")
+        intent.putExtra("device", device)
+        intent.`package` = "com.xiaomi.bluetooth"
+        context.sendBroadcast(intent)
+    }
+
     fun cancelPodsNotificationByMiuiBt(
         context: Context,
         device: BluetoothDevice,
