@@ -5,13 +5,23 @@ import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedModule
 import java.lang.reflect.Constructor
 import java.lang.reflect.Method
+import moe.chenxy.oppopods.config.ConfigManager
 
 abstract class HookContext {
     lateinit var module: XposedModule
     lateinit var appClassLoader: ClassLoader
     lateinit var prefs: SharedPreferences
+    lateinit var packageName: String
 
     abstract fun onHook()
+
+    fun fakeDeviceId(): String = ConfigManager.fakeDeviceId()
+
+    fun fakeSupport(): String = ConfigManager.fakeSupport()
+
+    fun refreshConfig() {
+        ConfigManager.refreshFromPrefs(prefs)
+    }
 
     fun findClass(name: String): Class<*> = Class.forName(name, false, appClassLoader)
 
@@ -50,6 +60,51 @@ abstract class HookContext {
     }
 }
 
+object Log {
+    @Volatile
+    var module: XposedModule? = null
+
+    fun v(tag: String, message: String) {
+        if (ConfigManager.logLevel() < ConfigManager.LOG_LEVEL_DEBUG) return
+        module?.log(android.util.Log.INFO, tag, message)
+    }
+
+    fun i(tag: String, message: String) {
+        if (ConfigManager.logLevel() < ConfigManager.LOG_LEVEL_BASIC) return
+        module?.log(android.util.Log.INFO, tag, message)
+    }
+
+    fun d(tag: String, message: String) {
+        if (ConfigManager.logLevel() < ConfigManager.LOG_LEVEL_DEBUG) return
+        module?.log(android.util.Log.INFO, tag, message)
+    }
+
+    fun d(tag: String, message: String, throwable: Throwable) {
+        if (ConfigManager.logLevel() < ConfigManager.LOG_LEVEL_DEBUG) return
+        module?.log(android.util.Log.ERROR, tag, message, throwable)
+    }
+
+    fun w(tag: String, message: String) {
+        if (ConfigManager.logLevel() < ConfigManager.LOG_LEVEL_BASIC) return
+        module?.log(android.util.Log.INFO, tag, message)
+    }
+
+    fun w(tag: String, message: String, throwable: Throwable) {
+        if (ConfigManager.logLevel() < ConfigManager.LOG_LEVEL_BASIC) return
+        module?.log(android.util.Log.ERROR, tag, message, throwable)
+    }
+
+    fun e(tag: String, message: String) {
+        if (ConfigManager.logLevel() < ConfigManager.LOG_LEVEL_BASIC) return
+        module?.log(android.util.Log.ERROR, tag, message)
+    }
+
+    fun e(tag: String, message: String, throwable: Throwable) {
+        if (ConfigManager.logLevel() < ConfigManager.LOG_LEVEL_BASIC) return
+        module?.log(android.util.Log.ERROR, tag, message, throwable)
+    }
+}
+
 class HookParam(private val chain: XposedInterface.Chain, initialResult: Any?) {
     val args: List<Any?> = chain.args
     val instance: Any? = chain.thisObject
@@ -68,6 +123,19 @@ fun getObjectField(instance: Any?, fieldName: String): Any? {
     while (cls != null) {
         runCatching {
             return cls.getDeclaredField(fieldName).apply { isAccessible = true }.get(instance)
+        }
+        cls = cls.superclass
+    }
+    throw NoSuchFieldException(fieldName)
+}
+
+fun setObjectField(instance: Any?, fieldName: String, value: Any?) {
+    if (instance == null) return
+    var cls: Class<*>? = instance.javaClass
+    while (cls != null) {
+        runCatching {
+            cls.getDeclaredField(fieldName).apply { isAccessible = true }.set(instance, value)
+            return
         }
         cls = cls.superclass
     }

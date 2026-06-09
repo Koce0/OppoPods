@@ -6,9 +6,11 @@
 
     <queries>
         <package android:name="com.heytap.headset" />
+        <package android:name="com.android.settings" />
     </queries>
 
     <application
+        android:name=".OppoPodsApp"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -17,13 +19,27 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.OppoPods">
 
+        <activity-alias
+            android:name=".LauncherActivity"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="@string/app_name"
+            android:roundIcon="@mipmap/ic_launcher_round"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
         <activity android:name=".MainActivity"
             android:launchMode="singleTask"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|mnc|colorMode|density|fontScale|fontWeightAdjustment|keyboard|layoutDirection|locale|mcc|navigation|smallestScreenSize|touchscreen|uiMode"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="de.robv.android.xposed.category.MODULE_SETTINGS" />
             </intent-filter>
         </activity>
         <activity android:name=".PopupActivity"
@@ -37,9 +53,10 @@
             </intent-filter>
         </activity>
         <provider
-            android:name=".provider.OppoPodsPrefsProvider"
-            android:authorities="moe.chenxy.oppopods.prefs"
-            android:exported="true" />
+            android:name=".config.PodImageProvider"
+            android:authorities="moe.chenxy.oppopods.podimages"
+            android:exported="true"
+            android:grantUriPermissions="false" />
         <!-- Set as Xposed Module -->
         <meta-data
             android:name="xposedmodule"

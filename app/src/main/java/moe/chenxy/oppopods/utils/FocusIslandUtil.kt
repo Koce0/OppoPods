@@ -8,13 +8,13 @@ import android.app.PendingIntent
 import android.bluetooth.BluetoothDevice
 import android.content.Context
 import android.content.Intent
-import android.graphics.BitmapFactory
+import android.content.SharedPreferences
 import android.graphics.drawable.Icon
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import com.xzakota.hyper.notification.focus.FocusNotification
 import moe.chenxy.oppopods.R
+import moe.chenxy.oppopods.hook.Log
 import moe.chenxy.oppopods.utils.miuiStrongToast.data.BatteryParams
 import moe.chenxy.oppopods.utils.miuiStrongToast.data.OppoPodsAction
 
@@ -25,13 +25,17 @@ object FocusIslandUtil {
     private const val CHANNEL_NAME = "OppoPods Battery"
     private const val PERSISTENT_CHANNEL_ID = "oppopods_persistent_focus_island"
     private const val PERSISTENT_CHANNEL_NAME = "OppoPods Island"
-    private const val NOTIFICATION_ID_TEMPORARY = 10086
+    private const val NOTIFICATION_ID = 10086
     private const val NOTIFICATION_ID_PERSISTENT = 10088
-    private const val MODULE_PACKAGE = "moe.chenxy.oppopods"
     private const val ISLAND_TIMEOUT_SECONDS = 3
     private const val DISMISS_DELAY_MS = 4000L
 
-    fun showBatteryIsland(context: Context, batteryParams: BatteryParams): Boolean {
+    fun showBatteryIsland(
+        context: Context,
+        prefs: SharedPreferences,
+        batteryParams: BatteryParams,
+        address: String,
+    ): Boolean {
         try {
             val leftConnected = batteryParams.left?.isConnected == true
             val rightConnected = batteryParams.right?.isConnected == true
@@ -42,12 +46,8 @@ object FocusIslandUtil {
             val leftText = if (leftConnected) "${batteryParams.left!!.battery}" else "-"
             val rightText = if (rightConnected) "${batteryParams.right!!.battery}" else "-"
 
-            // 从模块 APK 加载耳机图片为 Bitmap，避免跨包资源引用问题
-            val moduleContext = context.createPackageContext(
-                MODULE_PACKAGE, Context.CONTEXT_IGNORE_SECURITY
-            )
-            val leftBitmap = BitmapFactory.decodeResource(moduleContext.resources, R.drawable.img_left)
-            val rightBitmap = BitmapFactory.decodeResource(moduleContext.resources, R.drawable.img_right)
+            val leftBitmap = PodImageLoader.loadIslandLeftBitmap(context, prefs, address)
+            val rightBitmap = PodImageLoader.loadIslandRightBitmap(context, prefs, address)
 
             if (leftBitmap == null || rightBitmap == null) {
                 Log.e(TAG, "Failed to decode earphone icon bitmaps")
@@ -123,10 +123,10 @@ object FocusIslandUtil {
                 .addExtras(extras)
                 .build()
 
-            nm.notify(NOTIFICATION_ID_TEMPORARY, notification)
+            nm.notify(NOTIFICATION_ID, notification)
 
             Handler(Looper.getMainLooper()).postDelayed({
-                try { nm.cancel(NOTIFICATION_ID_TEMPORARY) } catch (_: Exception) {}
+                try { nm.cancel(NOTIFICATION_ID) } catch (_: Exception) {}
             }, DISMISS_DELAY_MS)
 
             Log.d(TAG, "Focus Island shown: L=$leftText% R=$rightText%")
@@ -139,33 +139,34 @@ object FocusIslandUtil {
 
     fun showPersistentIsland(
         context: Context,
+        prefs: SharedPreferences,
         batteryParams: BatteryParams,
-        device: BluetoothDevice?
+        device: BluetoothDevice?,
     ): Boolean {
         try {
             val leftConnected = batteryParams.left?.isConnected == true
             val rightConnected = batteryParams.right?.isConnected == true
-
             if (!leftConnected && !rightConnected) return false
 
+            val address = device?.address.orEmpty()
             val leftText = if (leftConnected) "${batteryParams.left!!.battery}" else "-"
             val rightText = if (rightConnected) "${batteryParams.right!!.battery}" else "-"
             var deviceName: String? = device?.alias
             if (deviceName?.isEmpty() == true) {
                 deviceName = device?.name
             }
-            val displayTitle = deviceName ?: ""
-            val notificationTag = "BTHeadset${device?.address ?: "unknown"}"
+            val displayTitle = deviceName ?: "OppoPods"
+            val notificationTag = "BTHeadset${address.ifEmpty { "unknown" }}"
 
             val moduleContext = context.createPackageContext(
-                MODULE_PACKAGE, Context.CONTEXT_IGNORE_SECURITY
+                "moe.chenxy.oppopods", Context.CONTEXT_IGNORE_SECURITY
             )
-            val leftBitmap = BitmapFactory.decodeResource(moduleContext.resources, R.drawable.img_left)
-            val rightBitmap = BitmapFactory.decodeResource(moduleContext.resources, R.drawable.img_right)
-            val boxBitmap = BitmapFactory.decodeResource(moduleContext.resources, R.drawable.img_box)
+            val leftBitmap = PodImageLoader.loadIslandLeftBitmap(context, prefs, address)
+            val rightBitmap = PodImageLoader.loadIslandRightBitmap(context, prefs, address)
+            val boxBitmap = PodImageLoader.loadBoxBitmap(context, prefs, address)
 
             if (leftBitmap == null || rightBitmap == null || boxBitmap == null) {
-                Log.e(TAG, "Failed to decode earphone icon bitmaps")
+                Log.e(TAG, "Failed to decode persistent island icon bitmaps")
                 return false
             }
 
@@ -203,11 +204,15 @@ object FocusIslandUtil {
             if (leftConnected) islandContentParts.add("L: ${batteryParams.left!!.battery}%")
             if (rightConnected) islandContentParts.add("R: ${batteryParams.right!!.battery}%")
             val islandContentText = islandContentParts.joinToString("  ")
+
             val pendingIntent = PendingIntent.getActivity(
                 context,
                 0,
                 Intent("chen.action.oppopods.show_pods_ui").apply {
                     setClassName("moe.chenxy.oppopods", "moe.chenxy.oppopods.PopupActivity")
+                    putExtra("android.bluetooth.device.extra.DEVICE", device)
+                    putExtra("bluetoothaddress", address)
+                    putExtra("device_name", deviceName)
                 },
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
@@ -215,6 +220,7 @@ object FocusIslandUtil {
             val ancCycleIntent = Intent(OppoPodsAction.ACTION_CYCLE_ANC).apply {
                 setPackage("com.android.bluetooth")
                 setIdentifier(notificationTag)
+                putExtra("device_name", displayTitle)
             }
             val ancAction = Notification.Action.Builder(
                 Icon.createWithResource(context, android.R.drawable.ic_lock_silent_mode),
@@ -338,6 +344,7 @@ object FocusIslandUtil {
                 .setContentText(contentText)
                 .setContentIntent(pendingIntent)
                 .setTicker("OppoPods")
+                .setOngoing(true)
                 .addExtras(extras)
                 .build()
 
@@ -354,23 +361,17 @@ object FocusIslandUtil {
     fun cancelIsland(context: Context) {
         try {
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            nm.cancel(NOTIFICATION_ID_TEMPORARY)
+            nm.cancel(NOTIFICATION_ID)
             nm.cancel(NOTIFICATION_ID_PERSISTENT)
-            nm.cancel(10086)
-            nm.cancel(10088)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to cancel Focus Island", e)
         }
     }
 
-    fun cancelPersistentIsland(context: Context, includeLegacyId: Boolean = false) {
+    fun cancelPersistentIsland(context: Context) {
         try {
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             nm.cancel(NOTIFICATION_ID_PERSISTENT)
-            nm.cancel(10088)
-            if (includeLegacyId) {
-                nm.cancel(10086)
-            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to cancel Persistent Focus Island", e)
         }

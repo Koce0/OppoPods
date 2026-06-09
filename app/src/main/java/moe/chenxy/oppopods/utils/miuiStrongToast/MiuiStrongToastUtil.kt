@@ -10,10 +10,10 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import android.widget.Toast
 import kotlinx.serialization.json.Json
 import moe.chenxy.oppopods.BuildConfig
+import moe.chenxy.oppopods.hook.Log
 import moe.chenxy.oppopods.utils.SystemApisUtils.isHyperOS
 import moe.chenxy.oppopods.utils.miuiStrongToast.data.BatteryParams
 import moe.chenxy.oppopods.utils.miuiStrongToast.data.IconParams
@@ -101,10 +101,12 @@ object MiuiStrongToastUtil {
 
     fun showPodsBatteryToastByMiuiBt(
         context: Context,
-        batteryParams: BatteryParams
+        batteryParams: BatteryParams,
+        device: BluetoothDevice? = null,
     ) {
         val intent = Intent("chen.action.oppopods.sendstrongtoast")
         intent.putExtra("batteryParams", batteryParams)
+        intent.putExtra("address", device?.address.orEmpty())
         intent.`package` = "com.xiaomi.bluetooth"
         context.sendBroadcast(intent)
     }
@@ -128,6 +130,16 @@ object MiuiStrongToastUtil {
     ) {
         val intent = Intent("chen.action.oppopods.updatepodspersistentisland")
         intent.putExtra("batteryParams", batteryParams)
+        intent.putExtra("device", device)
+        intent.`package` = "com.xiaomi.bluetooth"
+        context.sendBroadcast(intent)
+    }
+
+    fun cancelPodsPersistentIslandByMiuiBt(
+        context: Context,
+        device: BluetoothDevice,
+    ) {
+        val intent = Intent("chen.action.oppopods.cancelpodspersistentisland")
         intent.putExtra("device", device)
         intent.`package` = "com.xiaomi.bluetooth"
         context.sendBroadcast(intent)
