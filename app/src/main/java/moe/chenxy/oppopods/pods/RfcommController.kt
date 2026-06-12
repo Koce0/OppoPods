@@ -40,7 +40,6 @@ import java.util.concurrent.atomic.AtomicInteger
 object RfcommController {
     private const val TAG = "OppoPods-RfcommController"
     private const val AUTO_RECONNECT_DELAY_MS = 120_000L
-    private const val BATTERY_POLL_INTERVAL_MS = 30_000L
     private const val APP_UI_ACTIVE_TIMEOUT_MS = 75_000L
 
     // Basic Objects
@@ -89,7 +88,6 @@ object RfcommController {
     private var connectionJob: kotlinx.coroutines.Job? = null
     private var reconnectJob: kotlinx.coroutines.Job? = null
     private var readerJob: kotlinx.coroutines.Job? = null
-    private var batteryPollJob: kotlinx.coroutines.Job? = null
     private val reconnectAttempts = AtomicInteger(0)
     private var reconnectPending = false
     private val OPPO_RFCOMM_UUID: UUID = UUID.fromString("0000079A-D102-11E1-9B23-00025B00A5A5")
@@ -246,6 +244,21 @@ object RfcommController {
                 } else if (ConfigManager.persistentIsland() && ::currentBatteryParams.isInitialized) {
                     MiuiStrongToastUtil.showPodsPersistentIslandByMiuiBt(mContext ?: return, currentBatteryParams, mDevice)
                 }
+            }
+            OppoPodsAction.ACTION_RFCOMM_LOG_CONNECT -> {
+                if (!RfcommLog.isEnabled()) {
+                    RfcommLog.setEnabled(true, mContext)
+                }
+            }
+            OppoPodsAction.ACTION_RFCOMM_LOG_DISCONNECT -> {
+                RfcommLog.setEnabled(false)
+            }
+            OppoPodsAction.ACTION_RFCOMM_LOG_CLEAR -> {
+                RfcommLog.clear()
+            }
+            OppoPodsAction.ACTION_RFCOMM_DEBUG_SEND -> {
+                val hex = intent.getStringExtra("hex").orEmpty()
+                sendDebugHex(hex)
             }
         }
     }
@@ -460,7 +473,6 @@ object RfcommController {
         connectionJob?.cancel()
         reconnectJob?.cancel()
         readerJob?.cancel()
-        batteryPollJob?.cancel()
         closeSocketOnly()
         mContext = context
         mDevice = device
@@ -493,6 +505,10 @@ object RfcommController {
                 this.addAction(OppoPodsAction.ACTION_DUAL_DEVICE_CONNECTION_SET)
                 this.addAction(OppoPodsAction.ACTION_CYCLE_ANC)
                 this.addAction(OppoPodsAction.ACTION_CONFIG_CHANGED)
+                this.addAction(OppoPodsAction.ACTION_RFCOMM_LOG_CONNECT)
+                this.addAction(OppoPodsAction.ACTION_RFCOMM_LOG_DISCONNECT)
+                this.addAction(OppoPodsAction.ACTION_RFCOMM_LOG_CLEAR)
+                this.addAction(OppoPodsAction.ACTION_RFCOMM_DEBUG_SEND)
             }, Context.RECEIVER_EXPORTED)
             receiverRegistered = true
         }
@@ -590,12 +606,14 @@ object RfcommController {
                 reconnectAttempts.set(0)
                 reconnectPending = false
                 Log.d(TAG, "RFCOMM connected! uuid=$OPPO_RFCOMM_UUID")
+                RfcommLog.i(mContext, TAG, "connected uuid=$OPPO_RFCOMM_UUID")
                 changeUIConnectionState("connecting")
 
                 startPacketReader(newSocket.inputStream)
-                startBatteryPolling()
 
                 delay(300)
+                sendPacketSafe(Enums.ENABLE_STATUS_REPORT)
+                delay(50)
                 sendStatusQueryPackets(immediateReconnect = false)
 
                 if (autoGameModeEnabled) {
@@ -609,21 +627,9 @@ object RfcommController {
         }
     }
 
-    private fun startBatteryPolling() {
-        batteryPollJob?.cancel()
-        batteryPollJob = CoroutineScope(Dispatchers.IO).launch {
-            delay(2_000L)
-            while (isConnected) {
-                delay(BATTERY_POLL_INTERVAL_MS)
-                if (isConnected && socket != null) {
-                    sendStatusQueryPackets(immediateReconnect = false)
-                }
-            }
-        }
-    }
-
     private fun scheduleReconnect(reason: String, immediate: Boolean = false) {
         if (!isConnected || !::mDevice.isInitialized || mContext == null) return
+        RfcommLog.w(mContext, TAG, "schedule reconnect reason=$reason immediate=$immediate")
         closeSocketOnly()
         reconnectPending = true
         if (immediate) {
@@ -659,9 +665,7 @@ object RfcommController {
 
     private fun closeSocketOnly() {
         readerJob?.cancel()
-        batteryPollJob?.cancel()
         readerJob = null
-        batteryPollJob = null
         try {
             socket?.close()
         } catch (_: IOException) {}
@@ -677,9 +681,11 @@ object RfcommController {
                     val bytesRead = inputStream.read(buffer)
                     if (bytesRead > 0) {
                         val packet = buffer.copyOfRange(0, bytesRead)
+                        RfcommLog.d(mContext, "RFCOMM/RX", packet.toHexString(HexFormat.UpperCase))
                         handleOppoPacket(packet)
                     } else if (bytesRead == -1) {
                         Log.d(TAG, "RFCOMM stream ended")
+                        RfcommLog.w(mContext, TAG, "stream ended")
                         scheduleReconnect("stream ended")
                         break
                     }
@@ -687,6 +693,7 @@ object RfcommController {
             } catch (e: IOException) {
                 if (isConnected) {
                     Log.e(TAG, "RFCOMM read error", e)
+                    RfcommLog.e(mContext, TAG, "read error: ${e.message.orEmpty()}")
                     scheduleReconnect("read error")
                 }
             }
@@ -718,14 +725,6 @@ object RfcommController {
             currentWearStatus = mergeWearStatus(currentWearStatus, wearResult)
             changeUIWearStatus(currentWearStatus)
             showIslandForWearStatusChange(previousWearStatus, currentWearStatus)
-            return
-        }
-
-        val transparencyVocalEnhancementResult = TransparencyVocalEnhancementParser.parse(packet)
-        if (transparencyVocalEnhancementResult != null) {
-            Log.d(TAG, "Transparency vocal enhancement received: $transparencyVocalEnhancementResult")
-            currentTransparencyVocalEnhancement = transparencyVocalEnhancementResult
-            changeUITransparencyVocalEnhancementStatus(transparencyVocalEnhancementResult)
             return
         }
 
@@ -766,6 +765,21 @@ object RfcommController {
                 NoiseControlMode.ADAPTIVE -> 4
             }
             changeUIAncStatus(currentAnc)
+
+            val transparencyVocalEnhancementResult = TransparencyVocalEnhancementParser.parse(packet)
+            if (transparencyVocalEnhancementResult != null) {
+                Log.d(TAG, "Transparency vocal enhancement received: $transparencyVocalEnhancementResult")
+                currentTransparencyVocalEnhancement = transparencyVocalEnhancementResult
+                changeUITransparencyVocalEnhancementStatus(transparencyVocalEnhancementResult)
+            }
+            return
+        }
+
+        val transparencyVocalEnhancementResult = TransparencyVocalEnhancementParser.parse(packet)
+        if (transparencyVocalEnhancementResult != null) {
+            Log.d(TAG, "Transparency vocal enhancement received: $transparencyVocalEnhancementResult")
+            currentTransparencyVocalEnhancement = transparencyVocalEnhancementResult
+            changeUITransparencyVocalEnhancementStatus(transparencyVocalEnhancementResult)
             return
         }
 
@@ -807,7 +821,6 @@ object RfcommController {
         connectionJob?.cancel()
         reconnectJob?.cancel()
         readerJob?.cancel()
-        batteryPollJob?.cancel()
         reconnectAttempts.set(0)
         reconnectPending = false
 
@@ -844,15 +857,30 @@ object RfcommController {
         if (requestReason != null) reconnectNowForRequest(requestReason)
         try {
             val currentSocket = socket ?: run {
+                RfcommLog.w(mContext, "RFCOMM/TX", "socket null: ${packet.toHexString(HexFormat.UpperCase)}")
                 scheduleReconnect("socket null before send", immediate = requestReason != null)
                 return
             }
+            RfcommLog.d(mContext, "RFCOMM/TX", packet.toHexString(HexFormat.UpperCase))
             currentSocket.outputStream.write(packet)
             currentSocket.outputStream.flush()
         } catch (e: IOException) {
             Log.e(TAG, "Send packet failed", e)
+            RfcommLog.e(mContext, TAG, "send failed: ${e.message.orEmpty()}")
             scheduleReconnect("send error", immediate = requestReason != null)
         }
+    }
+
+    @OptIn(ExperimentalStdlibApi::class)
+    fun sendDebugHex(hex: String) {
+        val normalized = hex.filterNot { it.isWhitespace() || it == ':' || it == '-' }
+        if (normalized.isEmpty() || normalized.length % 2 != 0 || !normalized.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }) {
+            RfcommLog.e(mContext, "RFCOMM/DEBUG", "invalid HEX: $hex")
+            return
+        }
+        val packet = normalized.hexToByteArray()
+        RfcommLog.i(mContext, "RFCOMM/DEBUG", "send ${packet.size} bytes")
+        sendPacketSafe(packet, "rfcomm debug send")
     }
 
     fun setGameMode(enabled: Boolean) {
@@ -995,8 +1023,6 @@ object RfcommController {
 
     private suspend fun sendStatusQueryPackets(immediateReconnect: Boolean = true) {
         val reason = if (immediateReconnect) "status query" else null
-        sendPacketSafe(Enums.ENABLE_STATUS_REPORT, reason)
-        delay(50)
         sendPacketSafe(Enums.QUERY_STATUS, reason)
         delay(50)
         sendPacketSafe(Enums.QUERY_BATTERY, reason)

@@ -12,6 +12,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.provider.Settings
 import android.os.SystemClock
 import android.util.Log
 import android.widget.Toast
@@ -25,6 +26,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -53,6 +55,7 @@ import moe.chenxy.oppopods.pods.WearStatus
 import moe.chenxy.oppopods.pods.detectDeviceCapabilities
 import moe.chenxy.oppopods.ui.pages.AboutPage
 import moe.chenxy.oppopods.ui.pages.DeviceCapabilitiesPage
+import moe.chenxy.oppopods.ui.pages.RfcommDebugPage
 import moe.chenxy.oppopods.ui.pages.ThemeSettingsPage
 import moe.chenxy.oppopods.utils.RootManager
 import moe.chenxy.oppopods.utils.miuiStrongToast.data.BatteryParams
@@ -71,6 +74,7 @@ import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 
@@ -79,6 +83,7 @@ sealed interface Screen : NavKey {
     data object About : Screen
     data object Theme : Screen
     data object DeviceCapabilities : Screen
+    data object RfcommDebug : Screen
 }
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
@@ -501,6 +506,20 @@ fun MainUI(
         showDevicePicker = true
     }
 
+    fun openBluetoothSettings() {
+        val action = if (bluetoothState.enabled) Settings.ACTION_BLUETOOTH_SETTINGS else BluetoothAdapter.ACTION_REQUEST_ENABLE
+        Intent(action).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            runCatching { context.startActivity(this) }
+                .onFailure { Toast.makeText(context, R.string.connect_failed, Toast.LENGTH_SHORT).show() }
+        }
+    }
+
+    fun openDevicePicker() {
+        showDevicePicker = true
+        selectedTab = MainTab.Earphones
+    }
+
     @SuppressLint("MissingPermission")
     fun openSystemHeadsetSettings() {
         val address = connectedDeviceAddress
@@ -586,6 +605,8 @@ fun MainUI(
                 bluetoothServiceResponsive = bluetoothServiceResponsive,
                 bluetoothEnabled = bluetoothState.enabled,
                 bondedDeviceCount = bluetoothState.bondedCount,
+                onBluetoothStatusClick = { openBluetoothSettings() },
+                onPairedBluetoothClick = { openDevicePicker() },
                 showEarphoneDetail = showEarphoneDetail,
                 mainTitle = mainTitle.value,
                 displayTitle = displayTitle,
@@ -689,6 +710,7 @@ fun MainUI(
                 spatialAudioCapabilityOverride = spatialAudioCapabilityOverride,
                 spatialSoundSwitchCapabilityOverride = spatialSoundSwitchCapabilityOverride,
                 onOpenDeviceCapabilities = { backStack.add(Screen.DeviceCapabilities) },
+                onOpenRfcommDebug = { backStack.add(Screen.RfcommDebug) },
                 fakeDeviceId = fakeDeviceId,
                 onFakeDeviceIdChange = {
                     fakeDeviceId.value = it
@@ -841,6 +863,43 @@ fun MainUI(
                             ConfigManager.updateSpatialSoundSwitchCapabilityOverride(prefs, xposedService, it)
                             broadcastConfigChanged(context, "com.android.bluetooth")
                         },
+                    )
+                }
+            }
+        }
+        entry<Screen.RfcommDebug> {
+            val rfcommScrollBehavior = MiuixScrollBehavior(rememberTopAppBarState())
+            var clearRfcommLogsRequest by remember { mutableIntStateOf(0) }
+
+            Scaffold(
+                topBar = {
+                    TopAppBar(
+                        title = "RFCOMM 调试",
+                        largeTitle = "RFCOMM 调试",
+                        scrollBehavior = rfcommScrollBehavior,
+                        navigationIcon = {
+                            IconButton(onClick = { backStack.removeLast() }) {
+                                Icon(imageVector = MiuixIcons.Back, contentDescription = "Back")
+                            }
+                        },
+                        actions = {
+                            IconButton(onClick = { clearRfcommLogsRequest++ }) {
+                                Icon(imageVector = MiuixIcons.Delete, contentDescription = "Clear logs")
+                            }
+                        }
+                    )
+                }
+            ) { padding ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(backgroundColor)
+                        .padding(padding),
+                ) {
+                    RfcommDebugPage(
+                        modifier = Modifier.nestedScroll(rfcommScrollBehavior.nestedScrollConnection),
+                        contentPadding = PaddingValues(0.dp),
+                        clearRequest = clearRfcommLogsRequest,
                     )
                 }
             }
