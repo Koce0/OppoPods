@@ -260,7 +260,7 @@ object FocusIslandUtil {
                 islandFirstFloat = false
                 updatable = true
                 ticker = "OppoPods"
-                tickerPic = picLeft
+                tickerPic = logo
                 isShowNotification = true
 
                 iconTextInfo {
@@ -301,7 +301,7 @@ object FocusIslandUtil {
                     smallIslandArea {
                         picInfo {
                             type = 1
-                            pic = picLeft
+                            pic = logo
                         }
                     }
                     shareData {

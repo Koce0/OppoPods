@@ -563,10 +563,12 @@ fun MainUI(
         clearedImages: Set<PodImageResource>,
     ) {
         earphonePrefs.value = PodImagePrefs.saveImages(context, prefs, xposedService, address, name, images, clearedImages)
+        broadcastConfigChanged(context, "com.android.bluetooth")
     }
 
     fun savePodImageBytes(address: String, name: String, images: Map<PodImageResource, ByteArray>) {
         earphonePrefs.value = PodImagePrefs.saveImageBytes(context, prefs, xposedService, address, name, images)
+        broadcastConfigChanged(context, "com.android.bluetooth")
     }
 
     fun restartScopes(packages: List<String>) {
